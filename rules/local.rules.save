@@ -1,0 +1,37 @@
+#alert icmp any any -> any any ( msg:"ICMP Traffic Detected"; sid:10000001; metadata:policy security-ips alert; classtype:icmp-event;)
+
+
+#ICMP PING
+#alert icmp any any -> $HOME_NET any (msg:"ICMP test detected"; sid:10000001; rev:1; classtype:icmp-event; itype:8;)
+
+#SCANNING METHOD RULES
+#TCP Connect Scan
+alert tcp any any -> $HOME_NET any (msg:"Percobaan Scanning Teknik SYN/Stealth"; flags:SA; flow:stateless; classtype:SYN-Scan-Attempt; reference:cve,CVE-2006-1242; sid:1000002;)
+#alert tcp any any -> $HOME_NET any (msg:"Koneksi ACK Reply"; flags:A; flow:to_server,established;classtype:TCP-Full-Scan; reference:cve,CVE-2002-2071; reference:mitre&,T1046; sid:1000003;)
+
+#XMAS-FIN-NULL Scan (Avoiding Packet filter/firewall non-stateful)
+alert tcp any any -> $HOME_NET any (msg:"Deteksi Paket flags XMAS"; flags:FPU; flow:to_server,not_established; classtype:Xmas-Scan; reference:cve,CVE-2003-0393; reference:mitre&,T1595/002; reference:arachnids,30; sid:1000004;)
+alert tcp any any -> $HOME_NET any (msg:"Deteksi Paket flags FIN"; flags:F; flow:to_server,not_established; classtype:FIN-Scan; sid:1000005; reference:cve,CVE-2003-0393; reference:mitre&,T1595/002; window: 1024;)
+alert tcp any any -> $HOME_NET any (msg:"Deteksi Paket Non-Flags Set TCP"; flags:0; flow:to_server,not_established; classtype:NULL-Scan; reference:cve,CVE-2003-0393; reference:mitre&,T1595/002; reference:arachnids,4; sid:1000006;)
+
+#UDP Scan
+alert udp any 21 -> $HOME_NET :1024 (msg:"Traffic UDP ke Port 21 - 1024"; flow:to_server; classtype:UDP-Scan-Traffic; reference:mitre&,T1590/005; reference:cve,CVE-2021-20322; detection_filter:track by_src, count 5, seconds 3; sid:1000007;)
+#alert udp $HOME_NET 137 -> any any (msg:"Deteksi Server Reply UDP Port Netbios-ns"; flow:from_server; classtype:UDP-Port-Netbios; reference:mitre&,T1590/005; content:"RPATI"; sid:1000008;)
+#alert udp $HOME_NET 123 -> any any (msg:"Deteksi Server Reply UDP Port NTP"; flow:from_server; classtype:UDP-Port-NTP; reference:mitre&,T1590/005; content:"LOCL"; sid:1000009;)
+
+#Bruteforce
+#alert tcp $HOME_NET 2222 -> any any (msg:"INDICATOR-SCAN SSHbrute force login attempt"; flow:to_client; content:"|73 73 68|"; detection_filter:track by_src, count 5, seconds 60;metadata:service ssh; reference:cve,CVE-2021-28909; classtype:misc-SSH-activity; sid:1000010;)
+alert tcp any any -> $HOME_NET 22 (msg:"Indikator Serangan bruteforce ke SSH"; flow:to_server,not_established; content:"|53 53 48|"; detection_filter:track by_src, count 5, seconds 30;metadata:service ssh; reference:cve,CVE-2021-28909; classtype:misc-SSH-activity; sid:1000010;)
+alert tcp any any -> $HOME_NET 5900 (msg:"INDICATOR-SCAN VNC brute force login attempt"; flow:to_server,established; detection_filter:track by_src, count 5, seconds 60;metadata:service vnc; reference:cve,CVE-2021-20590; classtype:misc-VNC-activity; sid:1000011;)
+alert tcp $HOME_NET 21 -> any any (msg:"INDICATOR-SCAN FTP brute force login attempt"; flow:established; content:"530"; content:"Login incorrect"; detection_filter:track by_src, count 5, seconds 45;metadata:service ftp; reference:cve,CVE-2005-0798; classtype:misc-FTP-activity; sid:1000012;)
+alert tcp any any -> $HOME_NET 21 (msg:"Percobaan Bruteforce login"; flow:to_server,established; detection_filter: track by_src, count 5, seconds 60; metadata: service ftp; priority:1; sid:1000013;)
+
+#DDOS
+alert icmp any any -> $HOME_NET any (msg:"Serangan ICMP Flood"; rev:10; detection_filter:track by_src, count 100, seconds 10; classtype: icmp-flood-dos; itype:8; sid:1000014;)
+alert tcp any any -> $HOME_NET 22 (flags:A; msg:"Serangan DDoS flags ACK TCP ke SSH"; flow: stateless; detection_filter: track by_src, count 100, seconds 10; classtype:ssh-flood-dos; sid:1000016;)
+
+#alert tcp $EXTERNAL_NET any -> $HOME_NET 21 (msg:"Indikator Serangan bruteforce ke FTP"; flow:to_server; flags:PA; content:"PASS"; sid:10023697; metadata: service ftp; detection_filter:track by_src, count 5, seconds 60; classtype:ftp-flood-dos;)
+
+alert tcp any any -> $HOME_NET any (msg:"Indikasi Serangan DDoS"; content:"|58 58 58 58|"; flow: stateless; detection_filter: track by_src, count 10, seconds 30; classtype:ssh-flood-dos; sid:1000654;)
+#alert tcp any any -> $HOME_NET 22 (flags:S; msg:"Serangan DDoS flags SYN TCP ke SSH"; flow: stateless; threshold: type both, track by_src, count 100, seconds 10; classtype:ssh-flood-dos; sid:1000897;)
+#alert ip any any -> $HOME_NET any (msg:"Fragmented IP Protocol"; content:"XXXXX"; flow:stateless; sid:10002563;)

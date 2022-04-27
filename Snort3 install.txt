@@ -1,0 +1,295 @@
+SNORT3 INSTALL DEPEDENCIES
+
+sudo apt-get update && sudo apt-get dist-upgrade -y
+sudo dpkg-reconfigure tzdata
+
+# dir snort
+mkdir ~/snort_src
+cd ~/snort_src
+
+#depedensi
+sudo apt-get install -y build-essential autotools-dev libdumbnet-dev libluajit-5.1-dev libpcap-dev \
+zlib1g-dev pkg-config libhwloc-dev cmake liblzma-dev openssl libssl-dev cpputest libsqlite3-dev \
+libtool uuid-dev git autoconf bison flex libcmocka-dev libnetfilter-queue-dev libunwind-dev \
+libmnl-dev ethtool libjemalloc-dev git 
+
+# Safec Install 
+wget https://github.com/rurban/safeclib/releases/download/v02092020/libsafec-02092020.tar.gz
+tar -xzvf libsafec-02092020.tar.gz
+cd libsafec-02092020.0-g6d921f
+./configure
+make
+sudo make install
+
+
+# PCRE Install
+wget wget https://sourceforge.net/projects/pcre/files/pcre/8.45/pcre-8.45.tar.gz
+tar -xzvf pcre-8.45.tar.gz
+cd pcre-8.45
+./configure
+make
+sudo make install
+
+#gperftools Install
+wget https://github.com/gperftools/gperftools/releases/download/gperftools-2.9.1/gperftools-2.9.1.tar.gz
+tar xzvf gperftools-2.9.1.tar.gz
+cd gperftools-2.9.1
+./configure
+make
+sudo make install
+
+# Ragel Install
+wget http://www.colm.net/files/ragel/ragel-6.10.tar.gz
+tar -xzvf ragel-6.10.tar.gz
+cd ragel-6.10
+./configure
+make
+sudo make install
+
+# Hyperscan Install
+wget https://boostorg.jfrog.io/artifactory/main/release/1.77.0/source/boost_1_77_0.tar.gz
+wget https://github.com/intel/hyperscan/archive/refs/tags/v5.4.0.tar.gz
+tar -xvzf boost_1_77_0.tar.gz
+tar -xvzf v5.4.0.tar.gz
+mkdir ~/snort_src/hyperscan-5.4.0-build
+cd hyperscan-5.4.0-build/
+cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DBOOST_ROOT=~/snort_src/boost_1_77_0/ ../hyperscan-5.4.0
+make
+sudo make install
+
+# Flatbuffer Install
+wget https://github.com/google/flatbuffers/archive/refs/tags/v2.0.0.tar.gz -O flatbuffers-v2.0.0.tar.gz
+tar -xzvf flatbuffers-v2.0.0.tar.gz
+mkdir flatbuffers-build
+cd flatbuffers-build
+cmake ../flatbuffers-2.0.0
+make
+sudo make install
+
+SNORT INSTALL
+
+# Snort_Daq Install
+wget https://github.com/snort3/libdaq/archive/refs/tags/v3.0.5.tar.gz -O libdaq-3.0.5.tar.gz
+tar -xzvf libdaq-3.0.5.tar.gz
+cd libdaq-3.0.5
+./bootstrap
+./configure
+make
+sudo make install
+sudo ldconfig
+
+# Snort3 Install
+wget https://github.com/snort3/snort3/archive/refs/tags/3.1.18.0.tar.gz -O snort3-3.1.18.0.tar.gz
+tar -xzvf snort3-3.1.18.0.tar.gz
+cd snort3-3.1.18.0
+./configure_cmake.sh --prefix=/usr/local --enable-tcmalloc --enable-jemalloc
+cd build
+make
+sudo make install
+/usr/local/bin/snort -V
+
+#Check Snort
+snort -c /usr/local/etc/snort/snort.lua
+
+# Ethtool Service (optional)
+sudo nano /lib/systemd/system/ethtool.service
+
+[Unit]
+Description=Ethtool Configration for Network Interface
+[Service]
+Requires=network.target
+Type=oneshot
+ExecStart=/sbin/ethtool -K <interface> gro off
+ExecStart=/sbin/ethtool -K <interface> lro off
+[Install]
+WantedBy=multi-user.target
+
+sudo systemctl enable ethtool
+sudo service ethtool start
+
+# Snort Config
+sudo mkdir /usr/local/etc/rules
+sudo mkdir /usr/local/etc/so_rules/
+sudo mkdir /usr/local/etc/lists/
+sudo touch /usr/local/etc/rules/local.rules
+sudo touch /usr/local/etc/lists/default.blocklist
+sudo mkdir /var/log/snort
+
+sudo nano /usr/local/etc/rules/local.rules
+"example rules" : alert icmp any any -> any any ( msg:"ICMP Traffic Detected"; sid:10000001; metadata:policy security-ips alert;)
+
+## Verifikasi Snort + rules
+snort -c /usr/local/etc/snort/snort.lua -R /usr/local/etc/rules/local.rules
+
+## run IDS Mode
+sudo snort -c /usr/local/etc/snort/snort.lua -R /usr/local/etc/rules/local.rules -i <interface> -A alert_fast -s 65535 -k none
+
+# edit Config Snort.lua + test
+sudo nano /usr/local/etc/snort/snort.lua 
+line = 171 
+ips =
+{
+ enable_builtin_rules = true,
+ include = RULE_PATH .. "/local.rules",
+ variables = default_variables
+}
+
+## JSON Alert output plugin
+sudo nano /usr/local/etc/snort/snort.lua
+
+alert_json = (line 230)
+{
+file = true,
+limit = 100,
+fields = 'timestamp seconds action class dir proto src_addr src_ap src_port eth_src dst_addr dst_ap dst_port \
+eth_dst eth_len msg eth_type gid icmp_code icmp_id icmp_seq icmp_type iface ip_id ip_len \
+pkt_gen pkt_len pkt_num priority rev rule service sid  \
+target tcp_ack tcp_flags tcp_len tcp_seq tcp_win tos ttl udp_len ',
+}
+
+snort -c /usr/local/etc/snort/snort.lua
+sudo snort -c /usr/local/etc/snort/snort.lua -i <interface> -A alert_fast -s 65535 -k none
+
+# Running with log dir
+sudo /usr/local/bin/snort -c /usr/local/etc/snort/snort.lua -s 65535 -k none -l /var/log/snort -i enp0s3 -m 0x1b
+
+#### PULLEDPORK3 (optional)
+git clone https://github.com/shirkdog/pulledpork3.git
+
+cd ~/snort_src/pulledpork3
+sudo mkdir /usr/local/bin/pulledpork3
+sudo cp pulledpork.py /usr/local/bin/pulledpork3
+sudo cp -r lib/ /usr/local/bin/pulledpork3
+sudo chmod +x /usr/local/bin/pulledpork3/pulledpork.py
+sudo mkdir /usr/local/etc/pulledpork3
+sudo cp etc/pulledpork.conf /usr/local/etc/pulledpork3/
+
+# Verifikasi pulledpork
+/usr/local/bin/pulledpork3/pulledpork.py -V
+
+# edit pulledpork config
+sudo nano /usr/local/etc/pulledpork3/pulledpork.conf
+
+ community_ruleset = false
+ registered_ruleset = false
+ LightSPD_ruleset = true
+
+ snort_blocklist = true
+ et_blocklist = true
+
+ snort_path = /usr/local/bin/snort
+ local_rules = /usr/local/etc/rules/local.rules
+
+# run pulledpork
+sudo /usr/local/bin/pulledpork3/pulledpork.py -c /usr/local/etc/pulledpork3/pulledpork.conf
+
+# edit ulang snort.lua
+sudo nano /usr/local/etc/snort/snort.lua
+
+(jika menggunakan 2 rules)
+ips =
+{
+    enable_builtin_rules = true,
+    rules = [[
+                include /usr/local/etc/rules/pulledpork.rules
+                include /usr/local/etc/rules/local.rules
+        ]],
+
+    variables = default_variables
+}
+
+(hanya menggunakan 1 rules)
+ips =
+{
+enable_builtin_rules = true,
+include = RULE_PATH .. "/pulledpork.rules",
+variables = default_variables
+}
+
+# TEST pulledpork dengan so_rules
+snort -c /usr/local/etc/snort/snort.lua --plugin-path /usr/local/etc/so_rules/
+
+# SNORT STARTUP SERVICE
+sudo groupadd snort
+sudo useradd snort -r -s /sbin/nologin -c SNORT_IDS -g snort
+sudo chmod -R 5775 /var/log/snort
+sudo chown -R snort:snort /var/log/snort
+sudo nano /lib/systemd/system/snort3.service
+
+[Unit]
+Description=Snort3 NIDS Daemon
+After=syslog.target network.target
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/snort -c /usr/local/etc/snort/snort.lua -s 65535 \
+-k none -l /var/log/snort -D -u snort -g snort -i <interface> -m 0x1b --create-pidfile \
+--plugin-path=/usr/local/etc/so_rules/
+[Install]
+WantedBy=multi-user.target
+
+sudo systemctl enable snort3
+sudo service snort3 start
+service snort3 status
+# check
+sudo journalctl -u snort3.service
+
+# jika running dengan pulledpork3
+sudo nano /usr/local/etc/pulledpork3/pulledpork.conf
+#uncomment = pid_path=/var/log/snort/snort.pid
+
+# membuat service pulledpork untuk update rules perhari
+sudo nano /lib/systemd/system/pulledpork3_update.service
+
+[Unit]
+Description=Runs PulledPork3 to update Snort 3 Rulesets
+Wants=pulledpork3.timer
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/pulledpork3/pulledpork.py -c /usr/local/etc/pulledpork3/pulledpork.conf
+[Install]
+WantedBy=multi-user.target
+
+sudo systemctl enable pulledpork3
+sudo service pulledpork3 start
+
+sudo nano /lib/systemd/system/pulledpork3.timer
+
+[Unit]
+Description=Run PulledPork3 rule updater for Snort 3 rulesets
+RefuseManualStart=no # Allow manual starts
+RefuseManualStop=no # Allow manual stops
+
+[Timer]
+#Execute job if it missed a run due to machine being off
+Persistent=true
+#Run 120 seconds after boot for the first time
+OnBootSec=120
+#Run daily at 1 am
+OnCalendar=*-*-*13:35:00
+#File describing job to execute
+Unit=pulledpork3.service
+
+[Install]
+WantedBy=timers.target
+
+(running service 2 menit setelah boot, pulledpork akan run setiap hari jam 13:35)
+
+sudo systemctl enable pulledpork3.timer
+
+################### JIKA INGIN BUKAN FORMAT LOG JSON #######
+
+edit snort.lua
+
+contoh :
+-- 7 Configure Output
+
+alert_fast = { 
+        file = true, 
+        packet = false,
+        limit = 10,
+}
+
+
+
+
+

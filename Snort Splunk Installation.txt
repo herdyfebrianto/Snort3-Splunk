@@ -1,0 +1,102 @@
+=============== SPLUNK FORWARDER LINUX INSTALLATION ===============
+
+download splunk 
+www.splunk.com/en_us/download/universal-forwarder/
+
+extract tar.gz / install deb
+
+cd splunkforwarder/bin/
+./splunk start --accept-license
+- user admin
+- pass admin@123
+
+./splunk enable boot-start
+
+-----
+
+contoh 
+
+cd /opt/splunkforwarder/bin
+./splunk start --accept-license
+
+
+./splunk enable boot-start
+
+./splunk add forward-server 192.168.0.105:9997 
+( change the ip address with your splunk server ip)
+
+./splunk set deploy-poll 192.168.1.5:9997
+( change the ip address with your splunk server ip)
+
+add log files for monitoring
+
+./splunk add monitor /var/log/yum.log -index main
+./splunk add monitor /var/log/audit/audit.log -index main
+
+---checking
+./splunk list (monitor/forward-server)
+
+---remove
+./splunk remove (monitor/forward-server)
+
+============= LINUX FORWARD ===============
+
+SNORT (LOG COMMON ALERT)
+
+/opt/splunkforwarder/etc/system/local/inputs.conf
+
+[monitor:///var/log/snort/(file alert IDS)]
+disabled = false
+sourcetype = snort_alert_(fast/full)
+source = snort
+index = main
+host = IDS_snort
+
+-------------------------------------------------
+
+SNORT BARNYARD2 LOG
+
+[monitor:///var/log/snort/snort.u2.*]
+disabled = false
+sourcetype = snort_barnyard2_log
+source = snort
+index = main
+host = ids-snort
+
+-------------------------------------------------
+
+SNORT 3 (JSON ALERT)
+
+[monitor:///var/log/snort/alert_json.txt]
+sourcetype = snort3:alert:json
+source = snort3_json
+host = snort3
+disabled = false
+index = main
+
+====================================================================================
+-- Opsi troubleshoot --
+
+/opt/splunkforwarder/etc/apps/SplunkUniversalForwarder/local/transforms.conf atau di >> /etc/system/local/transforms.conf
+
+[default]
+host = IDS_snort
+
+[signature_for_snort]
+REGEX = snort(?:\[\d+\])?\:\s+\[[^\]]+\]\s+(.*?)(\s+\[Classification|\[Priority)
+FORMAT = signature::"$1"
+
+[signature_id_for_snort]
+REGEX = snort(?:\[\d+\])?\:\s+\[([^\]]+)
+FORMAT = signature_id::"$1
+
+--------------------------------
+
+/opt/splunkforwarder/etc/system/local/props.conf
+[snort_alert_full*]
+pulldown_type = true
+REPORT -snortfields = snortfields
+TZ = GMT
+TRANSFORMS -removecomments = removecomments
+
+====================================================================================
